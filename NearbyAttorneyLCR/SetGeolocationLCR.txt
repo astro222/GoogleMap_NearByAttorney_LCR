@@ -1,0 +1,12 @@
+// Trigger runs getLocation() on LCR with no Geolocation
+trigger SetGeolocationLCR on LawyerConnectionRequest__c (after insert, after update) {
+    for (LawyerConnectionRequest__c a : trigger.new){
+        if(Trigger.isUpdate){
+            if(a.MailingStreet__c != Trigger.oldMap.get(a.id).MailingStreet__c || a.MailingCity__c != Trigger.oldMap.get(a.id).MailingCity__c || a.MailingZip__c != Trigger.oldMap.get(a.id).MailingZip__c){
+                LocationCalloutsLCR.getLocation(a.id);
+            }
+        }
+        if (a.Location__Latitude__s == null)
+            LocationCalloutsLCR.getLocation(a.id);
+}
+}

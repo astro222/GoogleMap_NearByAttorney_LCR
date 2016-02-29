@@ -1,0 +1,116 @@
+<apex:page sidebar="false" showheader="false" standardController="LawyerConnectionRequest__c" extensions="FindNearbyAttorney">
+    <script type="text/javascript" 
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBimw4t2BSTvVSgeSNintWOlJE0Y8dIm5M">
+    </script>
+        
+    <!-- Setup the map to take up the whole window --> 
+    <style>
+        html, body { height: 100%; }
+        .page-map, .ui-content, #map-canvas { width: 100%; height:100%; padding: 0; }
+        #map-canvas { height: min-height: 100%; }
+    </style>
+    
+    <script>
+    
+    function initialize() {
+            var lat, lng;
+            var geocoder = new google.maps.Geocoder();
+        	var address = '{!LawyerConnectionRequest__c.MailingStreet__c},"",{!LawyerConnectionRequest__c.MailingCity__c},"",{!LawyerConnectionRequest__c.MailingState__c},"",{!LawyerConnectionRequest__c.MailingZip__c}'; 
+            console.log(address);
+            geocoder.geocode({'address': address}, function(results, status) {
+                if (status === google.maps.GeocoderStatus.OK) {
+                  lat = results[0].geometry.location.lat();
+                  lng = results[0].geometry.location.lng();
+                    
+                  Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.FindNearbyAttorney.getNearby}', lat, lng,
+                     function(result, event){
+                         if (event.status) {
+                             console.log('OK:'+result);
+                             createMap(lat, lng, result);           
+                         } else if (event.type === 'exception') {
+                            console.log('ISSUE IN CONTROLLER:'+result);
+                             //exception case code          
+                         } else {
+                            console.log('ISSUE IN CONTROLLER:'+result);
+                         }
+                      }, 
+                      {escape: true}
+                  );
+                  
+                } else {
+                  alert('Geocode was not successful for the following reason: ' + status);
+                }
+            });
+         }
+         function createMap(lat, lng, attorneys){
+            // Get the map div, and center the map at the proper geolocation
+            var customerLocation = new google.maps.LatLng(lat,lng);
+            var mapDiv = document.getElementById('map-canvas');
+            var map = new google.maps.Map(mapDiv, {
+                center: customerLocation, 
+                zoom: 13,
+                mapTypeId: google.maps.MapTypeId.ROADMAP
+            });
+            
+            // Set a marker for the current location
+            var positionMarker = new google.maps.Marker({
+                map: map,
+                position: customerLocation               
+            });
+                   
+            // Keep track of the map boundary that holds all markers
+            var mapBoundary = new google.maps.LatLngBounds();
+            mapBoundary.extend(customerLocation);            
+            
+            // Set markers on the map from FindNearby Attorney results
+ 			      var LCR = '{!LawyerConnectionRequest__c.LawyerPracticeArea__c}';
+
+            for(var i=0; i<attorneys.length;i++){
+                
+                var PA = attorneys[i].PracticeAreas__c;
+                var PAcall = attorneys[i].On_Call_Status__c;
+                if (LCR == PA && PAcall == 'Ready'){
+                  var marker = new google.maps.Marker({ 
+                      map: map,
+                      icon: 'https://maps.google.com/mapfiles/ms/micons/green.png',
+                      position: new google.maps.LatLng( 
+                                     attorneys[i].Location__Latitude__s, 
+                                     attorneys[i].Location__Longitude__s)                
+                  });
+                  
+                  mapBoundary.extend(marker.getPosition());
+                  var name = attorneys[i].Name;
+                  var street = attorneys[i].MailingStreet;
+                  var city = attorneys[i].MailingCity;
+                  var phone = attorneys[i].Phone;
+                  var practiceArea = attorneys[i].PracticeAreas__c;
+                  var content = "<div>"+ name + "<br/>" + street + "<br/>" + city +"<br/>" + phone + "<br/>" + practiceArea + "</div>";
+                  var infowindow = new google.maps.InfoWindow();
+  
+                  google.maps.event.addListener(marker,'click', (function(marker,content,infowindow){ 
+                        return function() {
+                           infowindow.setContent(content);
+                           infowindow.open(map,marker);
+                        };
+                  })(marker,content,infowindow));
+                }
+            }
+             
+            // Resize map to neatly fit all of the markers
+            map.fitBounds(mapBoundary);
+         }    
+     
+    
+        // Fire the initialize function when the window loads
+        google.maps.event.addDomListener(window, 'load', initialize);
+        
+    </script>
+    
+    
+    <body style="font-family: Arial; border: 0 none;">
+       
+   <!--  All content is rendered by the Google Maps code -->
+   <!--  This minimal HTML justs provide a target for GMaps to write to -->
+        <div id="map-canvas"></div>
+    </body>
+</apex:page>
